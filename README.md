@@ -8,4 +8,5 @@ Open `index.html` in a browser, or turn on GitHub Pages (Settings → Pages → 
 - Tracks HP, temp HP, spell slots, Bardic Inspiration, the free Dissonant Whisper, hit dice, and death saves.
 - Short and long rest buttons reset the right resources.
 - "Edit sheet" unlocks scores, skill proficiencies, text, gear, and spells.
-- Progress saves in your browser on each device.
+- Progress saves in your browser automatically for the whole campaign.
+- "Save to file" downloads a backup to your computer; "Load file" restores it on any device.

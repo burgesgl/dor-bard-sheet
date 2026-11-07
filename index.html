@@ -239,6 +239,7 @@ body.editing .view-only{display:none}
     <section class="card span2" id="campaign"></section>
     <section class="card span2" id="story"></section>
     <section class="card" id="rolls"></section>
+    <section class="card" id="backup"></section>
   </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -491,7 +492,7 @@ function renderVitals(){
   </div>
   <nav class="jump" aria-label="Sections">
     <a href="#abilities">Abilities</a><a href="#skills">Skills</a><a href="#resources">Resources</a><a href="#combat">Attacks</a>
-    <a href="#spells">Spells</a><a href="#features">Features</a><a href="#gear">Gear</a><a href="#campaign">Campaign</a><a href="#story">Character</a><a href="#rolls">Roll log</a>
+    <a href="#spells">Spells</a><a href="#features">Features</a><a href="#gear">Gear</a><a href="#campaign">Campaign</a><a href="#story">Character</a><a href="#rolls">Roll log</a><a href="#backup">Save file</a>
     <span class="sync" id="sync" style="margin-left:auto;padding:3px 4px;white-space:nowrap"></span>
   </nav></div>`;
   renderSync();
@@ -678,10 +679,42 @@ function renderRolls(){
   el.innerHTML = `<header><h2>Roll log</h2>${log.length?`<button class="btn small" data-act="clearlog">Clear</button>`:""}</header>
   <div class="log">${log.length?log.map(r=>`<div><span>${esc(r.l)} <span class="hint num">${esc(r.b)}</span></span><span class="r num">${r.t}</span></div>`).join(""):`<span class="hint">Rolls show up here.</span>`}</div>`;
 }
+const IN_CLAUDE = !!(window.claude && window.claude.use);
+function renderBackup(){
+  let last = ""; try{ last = localStorage.getItem(LSKEY+"-exported")||""; }catch(e){}
+  document.getElementById("backup").innerHTML = `<header><h2>Save file</h2></header>
+  <p class="hint" style="margin:0 0 10px">${IN_CLAUDE
+    ? "This copy saves to your Claude account. Load a file here to bring in progress from the GitHub version."
+    : "This page saves in this browser automatically. Save a file to your computer to back it up or move Dor to another device."}</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${IN_CLAUDE?"":`<button class="btn gold" data-act="export">Save to file</button>`}
+    <label class="btn" for="importFile" style="display:inline-flex;align-items:center">Load file</label>
+    <input id="importFile" type="file" accept=".json,application/json" hidden>
+  </div>
+  ${last&&!IN_CLAUDE?`<p class="hint" style="margin:8px 0 0">Last saved to file: ${esc(last)}</p>`:""}`;
+}
+function exportFile(){
+  const blob = new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const d = new Date(), stamp = d.toISOString().slice(0,10);
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `dor-sheet-${stamp}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  try{ localStorage.setItem(LSKEY+"-exported", d.toLocaleString()); }catch(e){}
+  renderBackup(); note("Saved to file", `dor-sheet-${stamp}.json is in your Downloads folder.`);
+}
+function importFile(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try{ const n = JSON.parse(r.result);
+      if(!n || n.v!==1 || !n.abil){ note("That file isn't a Dor sheet save","Pick a dor-sheet-….json file."); return; }
+      S = fill(n); save(); renderAll(); note("Loaded save file", `${S.hp}/${S.hpMax} HP, level ${S.level}`);
+    }catch(e){ note("Couldn't read that file","Pick a dor-sheet-….json file."); }
+  };
+  r.readAsText(file);
+}
 function renderAll(){
   document.body.classList.toggle("editing", editing);
   renderHeader(); renderVitals(); renderAbilities(); renderSkills(); renderResources();
-  renderCombat(); renderSpells(); renderFeatures(); renderGear(); renderProfs(); renderCampaign(); renderStory(); renderRolls();
+  renderCombat(); renderSpells(); renderFeatures(); renderGear(); renderProfs(); renderCampaign(); renderStory(); renderRolls(); renderBackup();
 }
 
 /* ---------- actions ---------- */
@@ -754,10 +787,12 @@ document.addEventListener("click", e=>{
     save(); renderSpells(); return; }
   if(a==="addeq"){ const n=document.getElementById("newItem").value.trim(); if(!n) return; S.equipment.push({name:n,qty:1}); save(); renderGear(); return; }
   if(a==="deleq"){ S.equipment.splice(+arg,1); save(); renderGear(); return; }
+  if(a==="export") return exportFile();
   if(a==="clearlog"){ S.log=[]; save(); renderRolls(); return; }
 });
 document.addEventListener("change", e=>{
   const t=e.target, ds=t.dataset;
+  if(t.id==="importFile"){ if(t.files && t.files[0]) importFile(t.files[0]); t.value=""; return; }
   if(ds.abil){ S.abil[ds.abil]=Math.max(1,Math.min(30,parseInt(t.value,10)||10)); save(); renderAll(); return; }
   if(ds.f){ const numeric=["level","hpMax","ac"]; S[ds.f] = numeric.includes(ds.f) ? (parseInt(t.value,10)||S[ds.f]) : t.value;
     if(ds.f==="level") S.level=Math.max(1,Math.min(10,S.level));

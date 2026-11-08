@@ -253,6 +253,8 @@ textarea,.ti{width:100%;background:var(--ink);border:1px solid var(--line);borde
 .log div{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid rgba(46,52,64,.5)}
 .log span.r{font-family:var(--display);font-weight:700;font-size:1.2rem;color:var(--gold)}
 
+.notes-area{width:100%;min-height:260px;background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px 14px;line-height:1.6;resize:vertical;
+  background-image:repeating-linear-gradient(transparent 0 calc(1.6em - 1px), rgba(217,177,90,.10) calc(1.6em - 1px) 1.6em);background-position:0 12px;background-attachment:local}
 .edit-only{display:none}
 body.editing .edit-only{display:revert}
 body.editing .view-only{display:none}
@@ -287,6 +289,7 @@ body.editing .view-only{display:none}
     <section class="card" id="skills"></section>
     <section class="card" id="resources"></section>
     <section class="card" id="combat"></section>
+    <section class="card" id="notes"></section>
     <section class="card span2" id="spells"></section>
     <section class="card" id="features"></section>
     <section class="card" id="gear"></section>
@@ -363,6 +366,7 @@ const DEFAULT = {
     tools:"Handpan + two more musical instruments (Bard)",
     campaign:"Continent: Enora. We start in Krillton (northwest coast). Dor's home, Sanguine, is at the far southeast tip.\nKrillton districts: Northern Pine (upper class), Southern Winds (middle class), Walnut Market, Fishscale Docks.\nHazelnut Inn: lovely diner, Maybelle.\nThe Mad Man Coupe attacked and razed Fogrime (north, near Gravakash)."
   },
+  notes:"",
   vps:[{who:"J.T.",n:1},{who:"R.Mc",n:1},{who:"M.R.",n:0},{who:"L.B.",n:0}],
   look:{age:"19",height:"5′10″",weight:"200 lb",eyes:"Silver, gold specks",skin:"Bronze",hair:"Silver"},
   log:[]
@@ -547,7 +551,7 @@ function renderVitals(){
   <div class="vrow navrow">
   <nav class="jump" aria-label="Sections">
     <a href="#abilities">Abilities</a><a href="#skills">Skills</a><a href="#resources">Resources</a><a href="#combat">Attacks</a>
-    <a href="#spells">Spells</a><a href="#features">Features</a><a href="#gear">Gear</a><a href="#campaign">Campaign</a><a href="#story">Character</a><a href="#rolls">Roll log</a><a href="#backup">Save file</a>
+    <a href="#notes">Notes</a><a href="#spells">Spells</a><a href="#features">Features</a><a href="#gear">Gear</a><a href="#campaign">Campaign</a><a href="#story">Character</a><a href="#rolls">Roll log</a><a href="#backup">Save file</a>
   </nav>
   <span class="sync" id="sync"></span>
   </div>`;
@@ -729,6 +733,17 @@ function renderCampaign(){
     </div>
   </div>`;
 }
+let notesTimer;
+function renderNotes(){
+  const el=document.getElementById("notes");
+  if(document.activeElement && document.activeElement.id==="notesArea") return;
+  el.innerHTML = `<header><h2>Notes</h2><span class="hint">Saves as you type</span></header>
+  <textarea id="notesArea" class="notes-area" aria-label="Session notes" placeholder="NPCs, clues, loot, who owes who…">${esc(S.notes||"")}</textarea>`;
+}
+document.addEventListener("input", e=>{
+  if(e.target.id!=="notesArea") return;
+  S.notes = e.target.value; clearTimeout(notesTimer); notesTimer=setTimeout(save,600);
+});
 function renderRolls(){
   const el = document.getElementById("rolls"); if(!el) return;
   const log = S.log||[];
@@ -770,7 +785,7 @@ function importFile(file){
 function renderAll(){
   document.body.classList.toggle("editing", editing);
   renderHeader(); renderVitals(); renderAbilities(); renderSkills(); renderResources();
-  renderCombat(); renderSpells(); renderFeatures(); renderGear(); renderProfs(); renderCampaign(); renderStory(); renderRolls(); renderBackup();
+  renderCombat(); renderSpells(); renderFeatures(); renderGear(); renderProfs(); renderNotes(); renderCampaign(); renderStory(); renderRolls(); renderBackup();
 }
 
 /* ---------- actions ---------- */

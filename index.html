@@ -659,6 +659,7 @@ function renderHeader(){
         <input class="ti" data-f="background" value="${esc(S.background)}" style="width:170px" aria-label="Background">
         <input class="ti" data-f="alignment" value="${esc(S.alignment)}" style="width:140px" aria-label="Alignment">
         <input class="ti" data-f="xp" value="${esc(S.xp)}" placeholder="XP" style="width:80px" aria-label="Experience">
+        ${S.college?`<button class="btn small" data-act="lu-uncollege">Change college (${esc(S.college)})</button>`:""}
       </div>`
     : `<b>${esc(S.race)} Bard ${S.level}${S.college?` · College of ${esc(S.college)}`:""}</b><span class="sep">◆</span>${esc(S.background)}<span class="sep">◆</span>${esc(S.alignment)}<span class="sep">◆</span>Player: ${esc(S.player)}${S.xp?`<span class="sep">◆</span>${esc(S.xp)} XP`:""}`;
   document.getElementById("editBtn").textContent = editing ? "Done editing" : "Edit sheet";
@@ -979,6 +980,7 @@ function luAction(a,arg,arg2){
   else if(a==="lu-hp"){ const c=M("con"); let gain;
     if(arg==="avg") gain=5+c; else { const r=d(8); gain=Math.max(1,r+c); show(`Level ${S.hpLevel+1} HP`, gain, `d8 ${r} ${sgn(c)}`, ""); }
     S.hpMax+=gain; S.hp+=gain; S.hpLevel++; if(arg==="avg") note(`+${gain} max HP`, `Now ${S.hpMax}`); }
+  else if(a==="lu-uncollege"){ const c=S.college; S.college=null; note(`College of ${c} removed`, "Pick again in the Level up panel."); }
   else if(a==="lu-college"){ S.college=arg; note(`College of ${arg}`, "Its features are in your Features list."); }
   else if(a==="lu-prof"){ S.skillProf[arg]=1; }
   else if(a==="lu-exp"){ S.skillProf[arg]=2; }

@@ -255,6 +255,31 @@ textarea,.ti{width:100%;background:var(--ink);border:1px solid var(--line);borde
 
 .notes-area{width:100%;min-height:260px;background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px 14px;line-height:1.6;resize:vertical;
   background-image:repeating-linear-gradient(transparent 0 calc(1.6em - 1px), rgba(217,177,90,.10) calc(1.6em - 1px) 1.6em);background-position:0 12px;background-attachment:local}
+.levelup{border-color:rgba(217,177,90,.6);box-shadow:inset 0 0 0 4px var(--ink-2),inset 0 0 0 5px rgba(217,177,90,.45),0 10px 30px rgba(217,177,90,.08)}
+.lu-items{display:flex;flex-direction:column;gap:18px}
+.lu-item h3{color:var(--gold);margin-bottom:4px}
+.lu-item > p{margin:0 0 10px;color:#c6cad3;font-size:.92rem;max-width:70ch}
+.lu-list{margin:4px 0 10px;padding-left:20px;color:#d3d7df}
+.lu-list li{margin:3px 0}
+.lu-opts{display:flex;gap:8px;flex-wrap:wrap}
+.lu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.lu-card{display:flex;flex-direction:column;gap:4px;text-align:left;background:var(--panel-2);border:1px solid var(--line);border-left:3px solid rgba(217,177,90,.5);border-radius:10px;padding:10px 12px;min-height:44px}
+.lu-name{font-family:var(--display);font-weight:700;font-size:1.15rem;color:#f1f3f7}
+.lu-src{font-family:var(--caps);font-size:.82rem;letter-spacing:.06em;color:var(--gold-2)}
+.lu-desc{font-size:.86rem;color:#bfc4ce}
+.lu-chips{display:flex;gap:8px;flex-wrap:wrap}
+.lu-chip{min-height:44px;background:var(--panel-2);border:1px solid rgba(217,177,90,.4);border-radius:22px;padding:6px 14px;font-weight:500}
+.lu-chip span{color:var(--dim);font-size:.8rem;margin-left:4px}
+.lu-more{margin-top:10px}
+.lu-more summary{list-style:none}
+.lu-more summary::-webkit-details-marker{display:none}
+.lu-more summary::before{content:"▸";margin-right:8px;transition:transform .15s;display:inline-block}
+.lu-more[open] summary::before{transform:rotate(90deg)}
+.lu-more summary{cursor:pointer;font-family:var(--caps);letter-spacing:.06em;font-size:1.05rem;color:var(--gold);min-height:40px;display:flex;align-items:center}
+.lu-list2{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:6px}
+.lu-row{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.lu-row b{font-family:var(--display);font-size:1.12rem;color:#f1f3f7}
+.lu-row p{margin:5px 0 0;font-size:.85rem;color:#bfc4ce}
 .edit-only{display:none}
 body.editing .edit-only{display:revert}
 body.editing .view-only{display:none}
@@ -285,6 +310,7 @@ body.editing .view-only{display:none}
   <div class="vitals" id="vitals"></div>
 
   <div class="grid">
+    <section class="card full levelup" id="levelup" hidden></section>
     <section class="card" id="abilities"></section>
     <section class="card" id="skills"></section>
     <section class="card" id="resources"></section>
@@ -366,11 +392,132 @@ const DEFAULT = {
     tools:"Handpan + two more musical instruments (Bard)",
     campaign:"Continent: Enora. We start in Krillton (northwest coast). Dor's home, Sanguine, is at the far southeast tip.\nKrillton districts: Northern Pine (upper class), Southern Winds (middle class), Walnut Market, Fishscale Docks.\nHazelnut Inn: lovely diner, Maybelle.\nThe Mad Man Coupe attacked and razed Fogrime (north, near Gravakash)."
   },
-  notes:"",
+  notes:"", hpLevel:2, seen:2, college:null, asi:{}, feats:[],
   vps:[{who:"J.T.",n:1},{who:"R.Mc",n:1},{who:"M.R.",n:0},{who:"L.B.",n:0}],
   look:{age:"19",height:"5′10″",weight:"200 lb",eyes:"Silver, gold specks",skin:"Bronze",hair:"Silver"},
   log:[]
 };
+
+/* ---------- level-up data (2014 PHB bard; other books marked) ---------- */
+const BARD_SPELLS_KNOWN = [0,4,5,6,7,8,9,10,11,12,14,15,15,16,18,19,19,20,22,22,22];
+const BARD_CANTRIPS = [0,2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4];
+const LEVEL_INFO = {
+  3:["Pick your Bard College (your subclass).","Expertise: double proficiency in 2 skills you're proficient in.","2nd-level spell slots open up."],
+  4:["Ability Score Improvement or a feat.","One more cantrip."],
+  5:["Bardic Inspiration becomes a d8.","Font of Inspiration: it now comes back on a short rest too.","3rd-level spell slots open up.","Cantrip damage goes up: Vicious Mockery 2d4, Sacred Flame 2d8."],
+  6:["Countercharm: as an action, start a performance. Until the end of your next turn, you and friends within 30 ft who can hear you have advantage on saves against being frightened or charmed.","Your college's 6th-level feature."],
+  7:["4th-level spell slots open up."],
+  8:["Another Ability Score Improvement or feat."],
+  9:["Song of Rest becomes a d8.","5th-level spell slots open up."],
+  10:["Bardic Inspiration becomes a d10.","Two more Expertise skills.","Magical Secrets: learn 2 spells from any class.","One more cantrip."]
+};
+const COLLEGES = {
+  Lore:{src:"PHB", blurb:"Skills and control. 3 extra skill proficiencies, and you can spend Bardic Inspiration to shrink an enemy's roll.",
+    f:{3:[["Bonus Proficiencies","Proficiency in 3 skills of your choice."],["Cutting Words","Reaction: when a creature within 60 ft that you can see makes an attack roll, ability check, or damage roll, spend a Bardic Inspiration and subtract the die from the roll. Decide after the roll but before you know the result."]],
+       6:[["Additional Magical Secrets","Learn 2 spells from any class's list (of a level you can cast). They count as bard spells but don't count against spells known."]]}},
+  Valor:{src:"PHB", blurb:"Frontline bard. Medium armor, shields and martial weapons, and your Inspiration can boost damage or AC.",
+    f:{3:[["Bonus Proficiencies","Medium armor, shields, and martial weapons."],["Combat Inspiration","A creature with your Bardic Inspiration die can add it to a weapon damage roll, or use its reaction to add it to its AC against one attack."]],
+       6:[["Extra Attack","Attack twice when you take the Attack action."]]}},
+  Glamour:{src:"Xanathar's", blurb:"Fey charm. Hand out temp HP and free movement, and charm a crowd after performing.",
+    f:{3:[["Mantle of Inspiration","Bonus action, spend a Bardic Inspiration: up to your CHA mod creatures within 60 ft gain 5 temp HP and can use their reaction to move without provoking opportunity attacks."],["Enthralling Performance","After performing for 1 minute, up to your CHA mod humanoids who watched make a WIS save or are charmed for 1 hour and idolize you."]],
+       6:[["Mantle of Majesty","Bonus action: cast Command without a slot, and as a bonus action each turn for 1 minute (concentration). Charmed creatures auto-fail."]]}},
+  Swords:{src:"Xanathar's", blurb:"Blade dancer. Medium armor and scimitars, a fighting style, and flourishes that spend Inspiration on attacks.",
+    f:{3:[["Bonus Proficiencies","Medium armor and the scimitar. You can use a melee weapon as a spellcasting focus."],["Fighting Style","Dueling (+2 damage with one one-handed weapon) or Two-Weapon Fighting."],["Blade Flourish","When you Attack, your speed rises by 10 ft. On a hit, spend Bardic Inspiration for Defensive (die to damage and AC), Slashing (die to damage on two creatures), or Mobile (die to damage and push 5 + die ft)."]],
+       6:[["Extra Attack","Attack twice when you take the Attack action."]]}},
+  Whispers:{src:"Xanathar's", blurb:"Spy and manipulator. Psychic damage on weapon hits and words that frighten.",
+    f:{3:[["Psychic Blades","Once per turn on a weapon hit, spend Bardic Inspiration for 2d6 extra psychic damage (3d6 at 5th level)."],["Words of Terror","Talk to a humanoid alone for 1 minute: WIS save or it's frightened of you or another creature for 1 hour. Once per short rest."]],
+       6:[["Mantle of Whispers","Reaction when a humanoid dies within 30 ft: capture its shadow and take its appearance for 1 hour, with its surface memories."]]}},
+  Eloquence:{src:"Tasha's", blurb:"Master speaker. Never roll below 10 on Persuasion or Deception, and Inspiration that's never wasted.",
+    f:{3:[["Silver Tongue","When you make a Persuasion or Deception check, treat a d20 roll of 9 or lower as a 10."],["Unsettling Words","Bonus action, spend Bardic Inspiration: a creature within 60 ft subtracts the die from its next saving throw before your next turn."]],
+       6:[["Unfailing Inspiration","If a creature adds your Bardic Inspiration die and still fails, it keeps the die."],["Universal Speech","Action: up to your CHA mod creatures within 60 ft understand you for 1 hour. Once per long rest (or spend a spell slot)."]]}},
+  Creation:{src:"Tasha's", blurb:"Maker. Inspiration dice that do extra tricks, and you can create objects with music.",
+    f:{3:[["Mote of Potential","Your Bardic Inspiration die gets a bonus: rolled twice for checks, a thunder burst after an attack hit, or temp HP on a save."],["Performance of Creation","Action: create a nonmagical item worth up to 20 × your bard level gp, lasting a few hours. Once per long rest (or spend a 2nd-level+ slot)."]],
+       6:[["Animating Performance","Action: animate a Large or smaller nonmagical item as a dancing item that fights for you for 1 hour. Once per long rest (or spend a 3rd-level+ slot)."]]}},
+  Spirits:{src:"Van Richten's", blurb:"Storyteller of the dead. Ghostly tales with random effects and better damage and healing.",
+    f:{3:[["Guiding Whispers","You learn the Guidance cantrip, with a 60 ft range."],["Spiritual Focus","Use a candle, crystal ball, skull, or tarot card as your focus. From 6th level, add 1d6 to one damage or healing roll of your bard spells."],["Tales from Beyond","Bonus action, spend Bardic Inspiration: roll on the Spirit Tales table and hold that tale to use later."]],
+       6:[["Spirit Session","Hold a 1-hour ritual to learn a divination or necromancy spell of any class temporarily."]]}}
+};
+const FEATS = [
+  ["Inspiring Leader","Spend 10 minutes giving a speech: up to 6 friends gain temp HP equal to your level + CHA mod. Once per short rest per creature. Needs CHA 13."],
+  ["War Caster","Advantage on CON saves to keep concentration. Cast with your hands full. Cast a spell as an opportunity attack."],
+  ["Resilient (CON)","+1 CON and proficiency in CON saves, so concentration holds better."],
+  ["Lucky","3 luck points per long rest: reroll your attack, check, or save, or an attack against you."],
+  ["Actor","+1 CHA. Advantage on Deception and Performance when posing as someone. Mimic voices."],
+  ["Alert","+5 initiative. Can't be surprised while conscious."],
+  ["Mobile","+10 ft speed. Dash ignores difficult terrain. No opportunity attacks from creatures you attack."],
+  ["Skilled","Proficiency in any 3 skills or tools."],
+  ["Magic Initiate","2 cantrips and one 1st-level spell from another class (cast once per long rest)."],
+  ["Tough","Max HP +2 per level."],
+  ["Observant","+1 INT or WIS. +5 passive Perception and Investigation. Read lips."]
+];
+/* [name, lvl, cast, range, dur, conc, save, dmg, dtype, desc] */
+const SPELL_OPTS = [
+ ["Blade Ward",0,"1 action","Self","1 round",0,"","","","Resistance to bludgeoning, piercing, and slashing damage from weapon attacks until your next turn."],
+ ["Dancing Lights",0,"1 action","120 ft","1 minute",1,"","","","Up to four floating lights you can move 60 ft as a bonus action."],
+ ["Friends",0,"1 action","Self","1 minute",1,"","","","Advantage on CHA checks against one creature. It knows afterward and may get hostile."],
+ ["Light",0,"1 action","Touch","1 hour",0,"","","","An object sheds bright light in a 20-ft radius."],
+ ["Mending",0,"1 minute","Touch","Instant",0,"","","","Repair a single break or tear in an object."],
+ ["Minor Illusion",0,"1 action","30 ft","1 minute",0,"","","","A sound or a still image of an object up to a 5-ft cube. Investigation vs your DC reveals it."],
+ ["Prestidigitation",0,"1 action","10 ft","1 hour",0,"","","","Small magic tricks: clean, chill, flavor, light a candle, make a small mark or trinket."],
+ ["True Strike",0,"1 action","30 ft","1 round",1,"","","","Advantage on your first attack roll against the target on your next turn."],
+ ["Animal Friendship",1,"1 action","30 ft","24 hours",0,"WIS","","","A beast with INT 3 or less is charmed by you."],
+ ["Bane",1,"1 action","30 ft","1 minute",1,"CHA","","","Up to 3 creatures subtract 1d4 from attacks and saves."],
+ ["Comprehend Languages",1,"1 action","Self","1 hour",0,"","","","Understand any spoken language and read any written one. Ritual."],
+ ["Cure Wounds",1,"1 action","Touch","Instant",0,"","","","A creature regains 1d8 + CHA mod HP. +1d8 per slot level above 1st."],
+ ["Detect Magic",1,"1 action","Self","10 minutes",1,"","","","Sense magic within 30 ft and see its aura and school. Ritual."],
+ ["Disguise Self",1,"1 action","Self","1 hour",0,"","","","Change how you look, clothes and gear included. Investigation vs your DC sees through it."],
+ ["Feather Fall",1,"Reaction","60 ft","1 minute",0,"","","","Up to 5 falling creatures drop slowly and take no falling damage."],
+ ["Heroism",1,"1 action","Touch","1 minute",1,"","","","Target can't be frightened and gains temp HP equal to your CHA mod each turn."],
+ ["Identify",1,"1 minute","Touch","Instant",0,"","","","Learn a magic item's properties and how to use it. Ritual."],
+ ["Illusory Script",1,"1 minute","Touch","10 days",0,"","","","Write a message only chosen readers can see. Ritual."],
+ ["Longstrider",1,"1 action","Touch","1 hour",0,"","","","Target's speed increases by 10 ft."],
+ ["Silent Image",1,"1 action","60 ft","10 minutes",1,"","","","A visual illusion up to a 15-ft cube that you can move."],
+ ["Sleep",1,"1 action","90 ft","1 minute",0,"","","","Roll 5d8: creatures with that many HP or fewer fall asleep, lowest HP first."],
+ ["Speak with Animals",1,"1 action","Self","10 minutes",0,"","","","Talk with beasts. Ritual."],
+ ["Unseen Servant",1,"1 action","60 ft","1 hour",0,"","","","An invisible force that does simple chores. Ritual."],
+ ["Animal Messenger",2,"1 action","30 ft","24 hours",0,"","","","A Tiny beast carries a 25-word message to a place you describe. Ritual."],
+ ["Blindness/Deafness",2,"1 action","30 ft","1 minute",0,"CON","","","Target is blinded or deafened. It re-saves at the end of each turn."],
+ ["Calm Emotions",2,"1 action","60 ft (20-ft sphere)","1 minute",1,"CHA","","","Humanoids that fail: suppress charm or fear, or make them indifferent to enemies."],
+ ["Detect Thoughts",2,"1 action","Self","1 minute",1,"WIS","","","Read surface thoughts within 30 ft. You can probe deeper."],
+ ["Enhance Ability",2,"1 action","Touch","1 hour",1,"","","","Advantage on checks with one ability, plus a bonus like temp HP for CON."],
+ ["Enthrall",2,"1 action","60 ft","1 minute",0,"WIS","","","Creatures that fail have disadvantage on Perception to notice anyone but you."],
+ ["Heat Metal",2,"Bonus action","60 ft","1 minute",1,"CON","2d8","fire","A metal object glows red-hot: 2d8 fire to anyone touching it, repeatable each turn."],
+ ["Hold Person",2,"1 action","60 ft","1 minute",1,"WIS","","","A humanoid is paralyzed. It re-saves at the end of each turn."],
+ ["Invisibility",2,"1 action","Touch","1 hour",1,"","","","A creature turns invisible until it attacks or casts a spell."],
+ ["Knock",2,"1 action","60 ft","Instant",0,"","","","Unlock a door, chest, or lock. Loud: audible 300 ft."],
+ ["Lesser Restoration",2,"1 action","Touch","Instant",0,"","","","End a disease or one condition: blinded, deafened, paralyzed, or poisoned."],
+ ["Locate Object",2,"1 action","Self","10 minutes",1,"","","","Sense the direction of an object you know within 1,000 ft."],
+ ["Magic Mouth",2,"1 minute","30 ft","Until dispelled",0,"","","","Set an object to speak a message when triggered. Ritual."],
+ ["Phantasmal Force",2,"1 action","60 ft","1 minute",1,"INT","1d6","psychic","An illusion only the target sees; it can deal 1d6 psychic per turn."],
+ ["See Invisibility",2,"1 action","Self","1 hour",0,"","","","See invisible creatures and objects."],
+ ["Shatter",2,"1 action","60 ft (10-ft sphere)","Instant",0,"CON","3d8","thunder","3d8 thunder in a 10-ft sphere, half on a save."],
+ ["Silence",2,"1 action","120 ft (20-ft sphere)","10 minutes",1,"","","","No sound in a 20-ft sphere. Blocks spells with verbal components. Ritual."],
+ ["Suggestion",2,"1 action","30 ft","8 hours",1,"WIS","","","Target follows a reasonable-sounding suggestion."],
+ ["Zone of Truth",2,"1 action","60 ft (15-ft sphere)","10 minutes",0,"CHA","","","Creatures that fail can't knowingly lie."],
+ ["Bestow Curse",3,"1 action","Touch","1 minute",1,"WIS","","","Curse a creature: disadvantage on one ability, extra 1d8 necrotic from you, and more."],
+ ["Clairvoyance",3,"10 minutes","1 mile","10 minutes",1,"","","","An invisible sensor lets you see or hear a place you know."],
+ ["Dispel Magic",3,"1 action","120 ft","Instant",0,"","","","End spells of 3rd level or lower on a target. Higher ones need a check."],
+ ["Fear",3,"1 action","Self (30-ft cone)","1 minute",1,"WIS","","","Creatures that fail drop what they hold and flee, frightened."],
+ ["Glyph of Warding",3,"1 hour","Touch","Until triggered",0,"","5d8","","A trap glyph that explodes or casts a stored spell."],
+ ["Hypnotic Pattern",3,"1 action","120 ft (30-ft cube)","1 minute",1,"WIS","","","Creatures that fail are charmed and incapacitated until damaged or shaken awake."],
+ ["Leomund's Tiny Hut",3,"1 minute","Self (10-ft hemisphere)","8 hours",0,"","","","A dome that keeps out creatures, spells, and weather. Ritual."],
+ ["Major Image",3,"1 action","120 ft","10 minutes",1,"","","","Full illusion up to a 20-ft cube, with sound, smell, and temperature."],
+ ["Nondetection",3,"1 action","Touch","8 hours",0,"","","","Hide a target from divination magic."],
+ ["Plant Growth",3,"1 action","150 ft","Instant",0,"","","","Overgrowth makes a 100-ft area cost 4 ft of movement per foot."],
+ ["Sending",3,"1 action","Unlimited","1 round",0,"","","","Send a 25-word message to a creature you know. It can reply."],
+ ["Speak with Dead",3,"1 action","10 ft","10 minutes",0,"","","","Ask a corpse up to five questions."],
+ ["Speak with Plants",3,"1 action","Self","10 minutes",0,"","","","Talk with plants and get them to move aside."],
+ ["Stinking Cloud",3,"1 action","90 ft (20-ft sphere)","1 minute",1,"CON","","","Creatures that fail lose their action to retching."],
+ ["Tongues",3,"1 action","Touch","1 hour",0,"","","","Target understands and speaks every language."],
+ ["Compulsion",4,"1 action","30 ft","1 minute",1,"WIS","","","Creatures that fail must move in a direction you choose."],
+ ["Confusion",4,"1 action","90 ft (10-ft sphere)","1 minute",1,"WIS","","","Creatures that fail act randomly each turn."],
+ ["Dimension Door",4,"1 action","500 ft","Instant",0,"","","","Teleport yourself and one willing creature up to 500 ft."],
+ ["Freedom of Movement",4,"1 action","Touch","1 hour",0,"","","","Target ignores difficult terrain, paralysis, and restraint."],
+ ["Greater Invisibility",4,"1 action","Touch","1 minute",1,"","","","A creature stays invisible even while attacking or casting."],
+ ["Hallucinatory Terrain",4,"10 minutes","300 ft","24 hours",0,"","","","Make up to a 150-ft cube of land look like different terrain."],
+ ["Locate Creature",4,"1 action","Self","1 hour",1,"","","","Sense the direction of a creature you know within 1,000 ft."],
+ ["Polymorph",4,"1 action","60 ft","1 hour",1,"WIS","","","Turn a creature into a beast. It keeps its mind if it's willing."]
+];
 
 const ABIL = [["str","Strength"],["dex","Dexterity"],["con","Constitution"],["int","Intelligence"],["wis","Wisdom"],["cha","Charisma"]];
 const SKILLS = [["acrobatics","Acrobatics","dex"],["animal","Animal Handling","wis"],["arcana","Arcana","int"],["athletics","Athletics","str"],
@@ -389,6 +536,11 @@ if(!S || S.v!==1) S = JSON.parse(JSON.stringify(DEFAULT));
 function fill(st){ const D=JSON.parse(JSON.stringify(DEFAULT));
   for(const k in D){ if(st[k]===undefined) st[k]=D[k]; }
   for(const k in D.text){ if(st.text[k]===undefined) st.text[k]=D.text[k]; }
+  if(st.hpLevel===undefined) st.hpLevel=st.level;
+  if(st.seen===undefined) st.seen=st.level;
+  if(st.college===undefined) st.college=null;
+  if(!st.asi) st.asi={};
+  if(!st.feats) st.feats=[];
   return st; }
 fill(S);
 let editing = false, adv = 0;
@@ -445,7 +597,8 @@ function skillBonus(key, ab){
   const p = S.skillProf[key]||0;
   return M(ab) + (p===2 ? 2*pb() : p===1 ? pb() : jack());
 }
-const initBonus = () => M("dex") + jack();
+const initBonus = () => M("dex") + jack() + ((S.feats||[]).some(f=>f.name==="Alert")?5:0);
+const cantripDice = (expr, lvl) => { if(lvl!==0||!expr) return expr; const t=S.level>=17?4:S.level>=11?3:S.level>=5?2:1; const m=/^(\d+)d(\d+)$/.exec(expr); return m?`${+m[1]*t}d${m[2]}`:expr; };
 const saveBonus = k => M(k) + (S.saveProf.includes(k)?pb():0);
 const dc = () => 8 + pb() + M("cha");
 const spellAtk = () => pb() + M("cha");
@@ -507,7 +660,7 @@ function renderHeader(){
         <input class="ti" data-f="alignment" value="${esc(S.alignment)}" style="width:140px" aria-label="Alignment">
         <input class="ti" data-f="xp" value="${esc(S.xp)}" placeholder="XP" style="width:80px" aria-label="Experience">
       </div>`
-    : `<b>${esc(S.race)} Bard ${S.level}</b><span class="sep">◆</span>${esc(S.background)}<span class="sep">◆</span>${esc(S.alignment)}<span class="sep">◆</span>Player: ${esc(S.player)}${S.xp?`<span class="sep">◆</span>${esc(S.xp)} XP`:""}`;
+    : `<b>${esc(S.race)} Bard ${S.level}${S.college?` · College of ${esc(S.college)}`:""}</b><span class="sep">◆</span>${esc(S.background)}<span class="sep">◆</span>${esc(S.alignment)}<span class="sep">◆</span>Player: ${esc(S.player)}${S.xp?`<span class="sep">◆</span>${esc(S.xp)} XP`:""}`;
   document.getElementById("editBtn").textContent = editing ? "Done editing" : "Edit sheet";
   document.getElementById("editBtn").classList.toggle("on", editing);
 }
@@ -576,10 +729,10 @@ function renderAbilities(){
 }
 
 function renderSkills(){
-  const n = profCount(), need = 7;
+  const n = profCount(), need = skillNeed();
   document.getElementById("skills").innerHTML = `
   <header><h2>Skills</h2><span class="hint num">${n} proficient · rest get ${sgn(jack())}</span></header>
-  ${n<need?`<div class="notice"><b>${need-n} skill picks still open.</b> Silverquill gives Intimidation and Persuasion. Pick 3 from Bard and 2 from Half-Elf. ${editing?"Tap the circles to choose.":"Tap “Edit sheet”, then tap the circles."}</div>`:""}
+  ${n<need?`<div class="notice"><b>${need-n} skill picks still open.</b> Silverquill gives Intimidation and Persuasion. Pick 3 from Bard and 2 from Half-Elf${S.college==="Lore"?", plus 3 from College of Lore":""}. ${editing?"Tap the circles to choose.":"Tap “Edit sheet”, then tap the circles."}</div>`:""}
   ${S.level>=3?`<div class="hint" style="margin-bottom:6px">Bard 3: tap a proficient circle again for Expertise (double proficiency) on 2 skills.</div>`:""}
   <div class="skills">${SKILLS.map(([k,n,a])=>{
     const p=S.skillProf[k]||0, cls=p===2?"e":p===1?"p":"j";
@@ -629,17 +782,17 @@ function renderCombat(){
       <button class="rollbtn num" data-roll="atk:${i}">Hit ${sgn(hit)}</button>
       <div style="display:flex;gap:4px"><button class="rollbtn" data-roll="atkd:${i}">Dmg</button><button class="rollbtn" data-roll="atkc:${i}" title="Critical damage">Crit</button></div></div>`;}).join("")}
   ${dmgCantrips.map(s=>{const i=S.spells.indexOf(s);
-    return `<div class="atk"><div><div class="nm">${esc(s.name)}</div><div class="sub">${esc(s.save)} save DC ${dc()} · ${esc(s.dmg)} ${esc(s.dtype)} · ${esc(s.range)}</div></div>
+    return `<div class="atk"><div><div class="nm">${esc(s.name)}</div><div class="sub">${esc(s.save)} save DC ${dc()} · ${esc(cantripDice(s.dmg,0))} ${esc(s.dtype)} · ${esc(s.range)}</div></div>
       <span class="tag num">DC ${dc()}</span><button class="rollbtn" data-roll="sdmg:${i}">Dmg</button></div>`;}).join("")}`;
 }
 
 function spellCard(s,i){
-  const tags = [s.cast, s.range, s.dur, s.save?`${s.save} save DC ${dc()}`:"", s.dmg?`${s.dmg} ${s.dtype}`:"", s.heal?`${s.heal}${sgn(M("cha"))} heal`:""].filter(Boolean);
+  const tags = [s.cast, s.range, s.dur, s.save?`${s.save} save DC ${dc()}`:"", s.dmg?`${cantripDice(s.dmg,s.lvl)} ${s.dtype}`:"", s.heal?`${s.heal}${sgn(M("cha"))} heal`:""].filter(Boolean);
   const lockedLvl = s.lvl>0 && !slotsFor(s.lvl);
   const acts = [];
   if(s.lvl>0 && !lockedLvl) acts.push(`<button class="btn small gold" data-act="cast:${i}">Cast (use ${ORD[s.lvl]} slot)</button>`);
   if(s.free) acts.push(`<button class="btn small" data-act="castfree:${i}" ${S.freeDWUsed?"disabled":""}>Cast free</button>`);
-  if(s.dmg) acts.push(`<button class="btn small" data-roll="sdmg:${i}">Roll ${esc(s.dmg)}</button>`);
+  if(s.dmg) acts.push(`<button class="btn small" data-roll="sdmg:${i}">Roll ${esc(cantripDice(s.dmg,s.lvl))}</button>`);
   if(s.heal) acts.push(`<button class="btn small" data-roll="sheal:${i}">Roll ${esc(s.heal)}${sgn(M("cha"))}</button>`);
   return `<div class="sp ${lockedLvl?"locked":""}">
     <div class="top"><div><span class="nm">${esc(s.name)}</span>
@@ -680,7 +833,11 @@ function renderFeatures(){
     ["Skill Versatility", "Half-Elf", "Proficiency in two skills of your choice."],
     ["Strixhaven Initiate (Silverquill)", "Background", "Sacred Flame and Vicious Mockery as cantrips. Dissonant Whisper once per long rest without a slot, and with slots normally. CHA for these spells."]
   ];
-  if(S.level>=3) F.push(["Expertise","Bard 3","Double proficiency on two chosen skills."],["Bard College","Bard 3","Your subclass. Add its features here once you pick."]);
+  if(S.level>=3) F.push(["Expertise","Bard 3","Double your proficiency bonus on "+(S.level>=10?"four":"two")+" chosen skills."]);
+  if(S.level>=5) F.push(["Font of Inspiration","Bard 5","Bardic Inspiration also comes back on a short rest."]);
+  if(S.level>=6) F.push(["Countercharm","Bard 6","Action: until the end of your next turn, you and friends within 30 ft who hear you have advantage on saves against being frightened or charmed."]);
+  if(S.college && COLLEGES[S.college]) Object.entries(COLLEGES[S.college].f).forEach(([L,list])=>{ if(S.level>=+L) list.forEach(([n,t])=>F.push([n,`College of ${S.college} ${L}`,t])); });
+  (S.feats||[]).forEach(f=>F.push([f.name,`Feat · level ${f.lvl}`,f.desc]));
   document.getElementById("features").innerHTML = `<header><h2>Features</h2></header>
   ${F.map(([n,s,t])=>`<div class="feat"><b>${n}</b><span class="src">${s}</span><p>${t}</p></div>`).join("")}`;
 }
@@ -733,6 +890,119 @@ function renderCampaign(){
     </div>
   </div>`;
 }
+/* ---------- level-up panel ---------- */
+const maxSpellLvl = () => { let m=0; for(let l=1;l<=9;l++) if(slotsFor(l)) m=l; return m; };
+const bardSpellsKnown = () => S.spells.filter(s=>s.src==="Bard" && s.lvl>0).length;
+const bardCantripsKnown = () => S.spells.filter(s=>s.src==="Bard" && s.lvl===0).length;
+const expertiseCount = () => Object.values(S.skillProf).filter(v=>v===2).length;
+const expertiseNeed = () => S.level>=10?4:S.level>=3?2:0;
+const skillNeed = () => 7 + (S.college==="Lore"?3:0);
+const ordinal = n => ORD[n]||(n+"th level");
+let luOpen = {};
+function renderLevelUp(){
+  const el=document.getElementById("levelup");
+  const items=[];
+  // what's new
+  if(S.seen < S.level){
+    const lines=[]; for(let l=S.seen+1;l<=S.level;l++) (LEVEL_INFO[l]||[]).forEach(t=>lines.push(`<li>${S.level-S.seen>1?`<b>Level ${l}:</b> `:""}${esc(t)}</li>`));
+    if(S.level>S.seen) lines.push(`<li>You can also swap one bard spell you know for another bard spell. Remove it in Edit, then add the new one below.</li>`);
+    items.push(`<div class="lu-item"><h3>New at level ${S.level}</h3><ul class="lu-list">${lines.join("")}</ul><button class="btn small" data-act="lu-seen">Got it</button></div>`);
+  }
+  // HP
+  if(S.level > S.hpLevel){
+    const next=S.hpLevel+1;
+    items.push(`<div class="lu-item"><h3>Hit points for level ${next}</h3><p>Take the average (+${5+M("con")}) or roll a d8${sgn(M("con"))}.</p>
+      <div class="lu-opts"><button class="btn gold small" data-act="lu-hp:avg">Take +${5+M("con")}</button><button class="btn small" data-act="lu-hp:roll">Roll d8${sgn(M("con"))}</button></div></div>`);
+  }
+  // college
+  if(S.level>=3 && !S.college){
+    const card=(k,c)=>`<button class="lu-card" data-act="lu-college:${k}"><span class="lu-name">College of ${k}</span><span class="lu-src">${esc(c.src)}</span><span class="lu-desc">${esc(c.blurb)}</span></button>`;
+    const phb=Object.entries(COLLEGES).filter(([k,c])=>c.src==="PHB"), other=Object.entries(COLLEGES).filter(([k,c])=>c.src!=="PHB");
+    items.push(`<div class="lu-item"><h3>Choose your Bard College</h3><p>Your campaign uses the Player's Handbook, which has Lore and Valor. The others need your DM's OK, like Silverquill did.</p>
+      <div class="lu-grid">${phb.map(([k,c])=>card(k,c)).join("")}</div>
+      <details class="lu-more"><summary>Colleges from other books</summary><div class="lu-grid">${other.map(([k,c])=>card(k,c)).join("")}</div></details></div>`);
+  }
+  // skills (Lore adds 3)
+  if(S.college==="Lore" && profCount()<skillNeed()){
+    items.push(`<div class="lu-item"><h3>${skillNeed()-profCount()} skill picks from College of Lore</h3><p>Tap any skill you aren't proficient in yet.</p>
+      <div class="lu-chips">${SKILLS.filter(([k])=>!S.skillProf[k]).map(([k,n,a])=>`<button class="lu-chip" data-act="lu-prof:${k}">${n} <span>${a.toUpperCase()}</span></button>`).join("")}</div></div>`);
+  }
+  // expertise
+  if(expertiseCount()<expertiseNeed()){
+    const pool=SKILLS.filter(([k])=>S.skillProf[k]===1);
+    items.push(`<div class="lu-item"><h3>${expertiseNeed()-expertiseCount()} Expertise pick${expertiseNeed()-expertiseCount()===1?"":"s"}</h3><p>Double your proficiency bonus in a skill you're already proficient in. CHA skills get the most out of it for Dor.</p>
+      <div class="lu-chips">${pool.map(([k,n,a])=>`<button class="lu-chip" data-act="lu-exp:${k}">${n} <span>${sgn(skillBonus(k,a))} → ${sgn(skillBonus(k,a)+pb())}</span></button>`).join("")}</div></div>`);
+  }
+  // cantrips
+  const cNeed = BARD_CANTRIPS[Math.min(S.level,20)] - bardCantripsKnown();
+  if(cNeed>0){
+    const known=new Set(S.spells.map(s=>s.name));
+    items.push(`<div class="lu-item"><h3>${cNeed} new cantrip${cNeed>1?"s":""}</h3>
+      <div class="lu-list2">${SPELL_OPTS.map((o,i)=>[o,i]).filter(([o])=>o[1]===0 && !known.has(o[0])).map(([o,i])=>optRow(o,i)).join("")}</div></div>`);
+  }
+  // spells known
+  const sNeed = BARD_SPELLS_KNOWN[Math.min(S.level,20)] - bardSpellsKnown();
+  if(sNeed>0){
+    const known=new Set(S.spells.filter(s=>s.src!=="Planned").map(s=>s.name)), top=maxSpellLvl();
+    const bardList=new Set(SPELL_OPTS.map(o=>o[0]));
+    const planned=S.spells.map((s,i)=>[s,i]).filter(([s])=>s.src==="Planned" && s.lvl<=top && bardList.has(s.name));
+    let groups="";
+    for(let l=top;l>=1;l--){
+      const opts=SPELL_OPTS.map((o,i)=>[o,i]).filter(([o])=>o[1]===l && !known.has(o[0]));
+      if(!opts.length) continue;
+      groups+=`<details class="lu-more" ${l===top?"open":""}><summary>${ordinal(l)} spells</summary><div class="lu-list2">${opts.map(([o,i])=>optRow(o,i)).join("")}</div></details>`;
+    }
+    items.push(`<div class="lu-item"><h3>${sNeed} new spell${sNeed>1?"s":""} to learn</h3><p>Any bard spell of ${ordinal(top).toLowerCase()} or lower.</p>
+      ${planned.length?`<div class="lu-opts" style="margin-bottom:8px">${planned.map(([s,i])=>`<button class="btn gold small" data-act="lu-plan:${i}">Learn ${esc(s.name)} (planned)</button>`).join("")}</div>`:""}
+      ${groups}</div>`);
+  }
+  // ASI / feat
+  [4,8,12,16,19].filter(L=>S.level>=L && !S.asi[L]).forEach(L=>{
+    const opts=[["cha2",`+2 CHA (${S.abil.cha}→${Math.min(20,S.abil.cha+2)})`,"Spell DC, spell attack, and Bardic Inspiration uses all go up."],
+      ["chadex",`+1 CHA, +1 DEX`,`DEX ${S.abil.dex}→${S.abil.dex+1}${(S.abil.dex+1)%2===0?" (+1 AC, attacks, initiative)":""}.`],
+      ["chacon",`+1 CHA, +1 CON`,`CON ${S.abil.con}→${S.abil.con+1}${(S.abil.con+1)%2===0?" (+1 HP per level, concentration)":""}.`]];
+    items.push(`<div class="lu-item"><h3>Level ${L}: Ability Score Improvement or feat</h3><p>CHA ${S.abil.cha}${S.abil.cha%2?" is odd, so a +1 CHA feat like Actor rounds it up":""}.</p>
+      <div class="lu-grid">${opts.map(([k,n,d])=>`<button class="lu-card" data-act="lu-asi:${L}:${k}"><span class="lu-name">${n}</span><span class="lu-desc">${esc(d)}</span></button>`).join("")}</div>
+      <details class="lu-more"><summary>Take a feat instead</summary><div class="lu-grid">${FEATS.map(([n,d],i)=>`<button class="lu-card" data-act="lu-feat:${L}:${i}"><span class="lu-name">${n}</span><span class="lu-desc">${esc(d)}</span></button>`).join("")}</div></details></div>`);
+  });
+  el.hidden = !items.length;
+  if(!items.length){ el.innerHTML=""; return; }
+  el.innerHTML = `<header><h2>Level up</h2><span class="hint">Shows up when a new level leaves something to choose</span></header><div class="lu-items">${items.join("")}</div>`;
+}
+function optRow(o,i){
+  const [n,l,cast,range,dur,conc,save,dm,dt,desc]=o;
+  const tags=[cast,range,dur,save?`${save} save`:"",dm?`${dm} ${dt}`:""].filter(Boolean);
+  return `<div class="lu-row"><div><b>${esc(n)}</b>${conc?` <span class="tag c">Concentration</span>`:""}<div class="tags">${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div><p>${esc(desc)}</p></div><button class="btn small gold" data-act="lu-learn:${i}">Learn</button></div>`;
+}
+function luAction(a,arg,arg2){
+  if(a==="lu-seen"){ S.seen=S.level; }
+  else if(a==="lu-hp"){ const c=M("con"); let gain;
+    if(arg==="avg") gain=5+c; else { const r=d(8); gain=Math.max(1,r+c); show(`Level ${S.hpLevel+1} HP`, gain, `d8 ${r} ${sgn(c)}`, ""); }
+    S.hpMax+=gain; S.hp+=gain; S.hpLevel++; if(arg==="avg") note(`+${gain} max HP`, `Now ${S.hpMax}`); }
+  else if(a==="lu-college"){ S.college=arg; note(`College of ${arg}`, "Its features are in your Features list."); }
+  else if(a==="lu-prof"){ S.skillProf[arg]=1; }
+  else if(a==="lu-exp"){ S.skillProf[arg]=2; }
+  else if(a==="lu-plan"){ const s=S.spells[+arg]; s.src="Bard"; note(`Learned ${s.name}`); }
+  else if(a==="lu-learn"){ const [n,l,cast,range,dur,conc,save,dm,dt,desc]=SPELL_OPTS[+arg];
+    const sp={name:n,lvl:l,src:"Bard",cast,range,dur,desc}; if(conc) sp.conc=true; if(save) sp.save=save; if(dm){ sp.dmg=dm; sp.dtype=dt; }
+    if(n==="Cure Wounds"){ sp.heal="1d8"; sp.healMod=true; }
+    S.spells.push(sp); note(`Learned ${n}`); }
+  else if(a==="lu-asi"){ const L=+arg;
+    if(arg2==="cha2") S.abil.cha=Math.min(20,S.abil.cha+2);
+    if(arg2==="chadex"){ S.abil.cha=Math.min(20,S.abil.cha+1); S.abil.dex=Math.min(20,S.abil.dex+1); }
+    if(arg2==="chacon"){ S.abil.cha=Math.min(20,S.abil.cha+1); S.abil.con=Math.min(20,S.abil.con+1); }
+    S.asi[L]=arg2; note("Ability scores updated"); }
+  else if(a==="lu-feat"){ const L=+arg, [n,desc]=FEATS[+arg2];
+    S.feats.push({name:n,desc,lvl:L}); S.asi[L]="feat:"+n;
+    if(n==="Actor") S.abil.cha=Math.min(20,S.abil.cha+1);
+    if(n==="Resilient (CON)"){ S.abil.con=Math.min(20,S.abil.con+1); if(!S.saveProf.includes("con")) S.saveProf.push("con"); }
+    if(n==="Mobile") S.speed+=10;
+    if(n==="Tough"){ S.hpMax+=2*S.level; S.hp+=2*S.level; }
+    note(`Took ${n}`, n==="Observant"?"Bump INT or WIS by 1 in Edit.":""); }
+  else return false;
+  save(); renderAll(); return true;
+}
+
 let notesTimer;
 function renderNotes(){
   const el=document.getElementById("notes");
@@ -784,7 +1054,7 @@ function importFile(file){
 }
 function renderAll(){
   document.body.classList.toggle("editing", editing);
-  renderHeader(); renderVitals(); renderAbilities(); renderSkills(); renderResources();
+  renderHeader(); renderVitals(); renderLevelUp(); renderAbilities(); renderSkills(); renderResources();
   renderCombat(); renderSpells(); renderFeatures(); renderGear(); renderProfs(); renderNotes(); renderCampaign(); renderStory(); renderRolls(); renderBackup();
 }
 
@@ -821,10 +1091,11 @@ document.addEventListener("click", e=>{
     if(t==="atk"){ const a=S.attacks[i]; return d20(a.name+" attack", M(a.abil)+pb()); }
     if(t==="atkd"){ const a=S.attacks[i]; return dmg(a.name+" damage", a.die, M(a.abil), a.type, false); }
     if(t==="atkc"){ const a=S.attacks[i]; return dmg(a.name+" crit", a.die, M(a.abil), a.type, true); }
-    if(t==="sdmg"){ const s=S.spells[i]; return dmg(s.name, s.dmg, 0, s.dtype, false); }
+    if(t==="sdmg"){ const s=S.spells[i]; return dmg(s.name, cantripDice(s.dmg,s.lvl), 0, s.dtype, false); }
     if(t==="sheal"){ const s=S.spells[i]; return dmg(s.name+" heal", s.heal, M("cha"), "", false); }
     return; }
   const [a,arg,arg2] = b.dataset.act.split(":");
+  if(a.startsWith("lu-") && luAction(a,arg,arg2)) return;
   if(a==="map"){ const v=document.getElementById("viewer"); document.getElementById("viewerImg").src=MAPS[arg]; v.hidden=false; v.querySelector("button").focus(); return; }
   if(a==="closemap"){ document.getElementById("viewer").hidden=true; return; }
   if(a==="vp"){ const v=S.vps[+arg]; v.n=Math.max(0,v.n+(+arg2)); save(); renderCampaign(); return; }

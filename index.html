@@ -213,6 +213,11 @@ textarea,.ti{width:100%;background:var(--ink);border:1px solid var(--line);borde
 .coins{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px}
 .coin{background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:6px 4px;text-align:center}
 .coin .k{font-family:var(--caps);font-size:.85rem;color:var(--gold);font-weight:600;letter-spacing:.08em}
+.purse{background:var(--ink-2);border:1px solid rgba(217,177,90,.25);border-radius:12px;padding:10px;margin-bottom:12px}
+.purse .coins{margin-top:0}
+.coinrow{display:flex;gap:8px;margin-top:10px}
+.coinrow input{flex:1;min-width:0;min-height:44px;background:var(--ink);border:1px solid var(--line);border-radius:9px;padding:6px 10px}
+.coinrow select{min-height:44px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-weight:600}
 .coin input{width:100%;background:transparent;border:0;text-align:center;font-weight:600;font-size:1.05rem;padding:0;min-height:30px}
 .feat{padding:9px 0;border-bottom:1px solid rgba(46,52,64,.6)}
 .feat:last-child{border-bottom:0}
@@ -695,6 +700,7 @@ function renderVitals(){
       <span class="chip">AC ${editing?`<input class="ti num" type="number" data-f="ac" value="${S.ac}" style="width:52px;padding:1px 4px">`:`<b class="num">${S.ac}</b>`}</span>
       <button class="chip" data-roll="init">Init <b class="num">${sgn(initBonus())}</b></button>
       <span class="chip">Speed <b class="num">${S.speed} ft</b></span>
+      <a class="chip" href="#coins" style="text-decoration:none">Gold <b class="num">${S.coins.gp}</b></a>
       <span class="chip">Prof <b class="num">${sgn(pb())}</b></span>
       <span class="chip">Passive Perc <b class="num">${passive()}</b></span>
       <span class="chip">Spell DC <b class="num">${dc()}</b></span>
@@ -705,7 +711,7 @@ function renderVitals(){
   <div class="vrow navrow">
   <nav class="jump" aria-label="Sections">
     <a href="#abilities">Abilities</a><a href="#skills">Skills</a><a href="#resources">Resources</a><a href="#combat">Attacks</a>
-    <a href="#notes">Notes</a><a href="#spells">Spells</a><a href="#features">Features</a><a href="#gear">Gear</a><a href="#campaign">Campaign</a><a href="#story">Character</a><a href="#rolls">Roll log</a><a href="#backup">Save file</a>
+    <a href="#notes">Notes</a><a href="#spells">Spells</a><a href="#features">Features</a><a href="#gear">Gear</a><a href="#coins">Coins</a><a href="#campaign">Campaign</a><a href="#story">Character</a><a href="#rolls">Roll log</a><a href="#backup">Save file</a>
   </nav>
   <span class="sync" id="sync"></span>
   </div>`;
@@ -844,11 +850,35 @@ function renderFeatures(){
 }
 
 function renderGear(){
-  document.getElementById("gear").innerHTML = `<header><h2>Equipment</h2><span class="hint">Tap a number to edit</span></header>
+  const totalGp = (S.coins.cp/100 + S.coins.sp/10 + S.coins.ep/2 + S.coins.gp + S.coins.pp*10);
+  document.getElementById("gear").innerHTML = `<header><h2>Equipment</h2><span class="hint num">Worth ${+totalGp.toFixed(2)} gp in coin</span></header>
+  <div class="purse" id="coins">
+    <div class="coins">${["cp","sp","ep","gp","pp"].map(c=>`<label class="coin"><div class="k">${c.toUpperCase()}</div><input class="num" type="number" inputmode="numeric" min="0" data-coin="${c}" value="${S.coins[c]}"></label>`).join("")}</div>
+    <div class="coinrow">
+      <input id="coinAmt" class="num" type="number" inputmode="numeric" min="1" placeholder="Amount" aria-label="Coin amount">
+      <select id="coinType" aria-label="Coin type">${["cp","sp","ep","gp","pp"].map(c=>`<option value="${c}" ${c===coinPick?"selected":""}>${c.toUpperCase()}</option>`).join("")}</select>
+      <button class="btn small gold" data-act="coin:add">Add</button>
+      <button class="btn small" data-act="coin:spend">Spend</button>
+    </div>
+  </div>
   <div class="list">${S.equipment.map((e,i)=>`<div class="li"><span>${esc(e.name)}</span>
     <span style="display:flex;gap:4px;align-items:center">${editing?`<input class="ti num" type="number" min="0" data-eq="${i}" value="${e.qty}" style="width:56px;padding:2px 4px"><button class="x" data-act="deleq:${i}" aria-label="Remove ${esc(e.name)}">×</button>`:`<span class="num hint">×${e.qty}</span>`}</span></div>`).join("")}</div>
-  <div class="addrow"><input id="newItem" placeholder="Add an item"><button class="btn small" data-act="addeq">Add</button></div>
-  <div class="coins">${["cp","sp","ep","gp","pp"].map(c=>`<label class="coin"><div class="k">${c.toUpperCase()}</div><input class="num" type="number" min="0" data-coin="${c}" value="${S.coins[c]}"></label>`).join("")}</div>`;
+  <div class="addrow"><input id="newItem" placeholder="Add an item"><button class="btn small" data-act="addeq">Add</button></div>`;
+}
+let coinPick="gp";
+const COINV={cp:1,sp:10,ep:50,gp:100,pp:1000}, COINO=["cp","sp","ep","gp","pp"];
+function coinChange(kind){
+  const amt=parseInt(document.getElementById("coinAmt").value,10), t=document.getElementById("coinType").value; coinPick=t;
+  if(!(amt>0)){ note("Enter an amount first"); return; }
+  if(kind==="add"){ S.coins[t]+=amt; save(); renderGear(); note(`+${amt} ${t}`, `${S.coins[t]} ${t} now`); return; }
+  // spend: break bigger coins into this type if needed
+  const C={...S.coins};
+  while(C[t]<amt){
+    const h=COINO.slice(COINO.indexOf(t)+1).find(x=>C[x]>0);
+    if(!h){ note(`Not enough ${t}`, `You have ${S.coins[t]} ${t}. Spend a bigger coin type instead.`); return; }
+    C[h]--; C[t]+=COINV[h]/COINV[t];
+  }
+  C[t]-=amt; S.coins=C; save(); renderGear(); note(`Spent ${amt} ${t}`, `${S.coins[t]} ${t} left`);
 }
 
 function textField(k,label,rows){
@@ -1129,6 +1159,7 @@ document.addEventListener("click", e=>{
   if(a==="addspell"){ const n=document.getElementById("nsName").value.trim(); if(!n) return;
     S.spells.push({name:n,lvl:Math.max(0,Math.min(5,+document.getElementById("nsLvl").value||0)),src:"Bard",cast:"",range:"",dur:"",desc:document.getElementById("nsDesc").value.trim()});
     save(); renderSpells(); return; }
+  if(a==="coin") return coinChange(arg);
   if(a==="addeq"){ const n=document.getElementById("newItem").value.trim(); if(!n) return; S.equipment.push({name:n,qty:1}); save(); renderGear(); return; }
   if(a==="deleq"){ S.equipment.splice(+arg,1); save(); renderGear(); return; }
   if(a==="export") return exportFile();
@@ -1151,6 +1182,7 @@ document.addEventListener("keydown", e=>{
   if(e.key==="Escape"){ document.getElementById("viewer").hidden=true; return; }
   if(e.key!=="Enter") return;
   if(e.target.id==="hpAmt"){ e.preventDefault(); hpChange("dmg"); }
+  if(e.target.id==="coinAmt"){ e.preventDefault(); coinChange("add"); return; }
   if(e.target.id==="newItem"){ e.preventDefault(); document.querySelector('[data-act="addeq"]').click(); }
 });
 renderAll();

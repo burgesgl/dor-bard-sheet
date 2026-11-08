@@ -285,6 +285,13 @@ textarea,.ti{width:100%;background:var(--ink);border:1px solid var(--line);borde
 .lu-row{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .lu-row b{font-family:var(--display);font-size:1.12rem;color:#f1f3f7}
 .lu-row p{margin:5px 0 0;font-size:.85rem;color:#bfc4ce}
+.newtag{color:var(--ink);background:var(--gold);border-color:var(--gold);font-weight:600}
+.pick-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.pick-list li{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid rgba(46,52,64,.6)}
+.pick-list li:last-child{border-bottom:0}
+.pick-day{font-family:var(--caps);color:var(--gold);letter-spacing:.05em;min-width:96px}
+.pick-list li > span:nth-child(2){flex:1}
+.pick-lvl{color:var(--dim);font-size:.8rem}
 .edit-only{display:none}
 body.editing .edit-only{display:revert}
 body.editing .view-only{display:none}
@@ -316,6 +323,7 @@ body.editing .view-only{display:none}
 
   <div class="grid">
     <section class="card full levelup" id="levelup" hidden></section>
+    <section class="card full picks" id="picks" hidden></section>
     <section class="card" id="abilities"></section>
     <section class="card" id="skills"></section>
     <section class="card" id="resources"></section>
@@ -546,6 +554,8 @@ function fill(st){ const D=JSON.parse(JSON.stringify(DEFAULT));
   if(st.college===undefined) st.college=null;
   if(!st.asi) st.asi={};
   if(!st.feats) st.feats=[];
+  if(!st.picks) st.picks=[];
+  if(!st.sessionAt) st.sessionAt="2026-11-08T03:14:00.000Z";
   return st; }
 fill(S);
 let editing = false, adv = 0;
@@ -745,7 +755,7 @@ function renderSkills(){
     const p=S.skillProf[k]||0, cls=p===2?"e":p===1?"p":"j";
     return `<div class="sk">
       ${editing?`<button class="dot ${cls}" data-prof="${k}" aria-label="Toggle proficiency in ${n}"></button>`:`<span class="dot ${cls}" title="${p===2?"Expertise":p===1?"Proficient":"Jack of All Trades"}"></span>`}
-      <span class="nm">${n}</span><span class="ab3">${a.toUpperCase()}</span>
+      <span class="nm">${n} ${newBadge("skill",k)}</span><span class="ab3">${a.toUpperCase()}</span>
       <button class="rollbtn num" data-roll="skill:${k}">${sgn(skillBonus(k,a))}</button>
     </div>`;}).join("")}
   </div>`;
@@ -803,7 +813,7 @@ function spellCard(s,i){
   if(s.heal) acts.push(`<button class="btn small" data-roll="sheal:${i}">Roll ${esc(s.heal)}${sgn(M("cha"))}</button>`);
   return `<div class="sp ${lockedLvl?"locked":""}">
     <div class="top"><div><span class="nm">${esc(s.name)}</span>
-      <div class="tags">${s.src?`<span class="tag src">${esc(s.src)}</span>`:""}${s.conc?`<span class="tag c">Concentration</span>`:""}${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></div>
+      <div class="tags">${newBadge("spell",s.name)}${s.src?`<span class="tag src">${esc(s.src)}</span>`:""}${s.conc?`<span class="tag c">Concentration</span>`:""}${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></div>
       ${editing?`<button class="x" data-act="delspell:${i}" aria-label="Remove ${esc(s.name)}">×</button>`:""}</div>
     <p>${esc(s.desc)}</p>
     ${acts.length?`<div class="acts">${acts.join("")}</div>`:""}
@@ -846,7 +856,7 @@ function renderFeatures(){
   if(S.college && COLLEGES[S.college]) Object.entries(COLLEGES[S.college].f).forEach(([L,list])=>{ if(S.level>=+L) list.forEach(([n,t])=>F.push([n,`College of ${S.college} ${L}`,t])); });
   (S.feats||[]).forEach(f=>F.push([f.name,`Feat · level ${f.lvl}`,f.desc]));
   document.getElementById("features").innerHTML = `<header><h2>Features</h2></header>
-  ${F.map(([n,s,t])=>`<div class="feat"><b>${n}</b><span class="src">${s}</span><p>${t}</p></div>`).join("")}`;
+  ${F.map(([n,s,t])=>`<div class="feat"><b>${n}</b><span class="src">${s}</span>${(S.college&&s.startsWith("College of "+S.college))?" "+newBadge("college",S.college):s.startsWith("Feat")?" "+newBadge("feat",n):""}<p>${t}</p></div>`).join("")}`;
 }
 
 function renderGear(){
@@ -1000,6 +1010,21 @@ function renderLevelUp(){
   if(!items.length){ el.innerHTML=""; return; }
   el.innerHTML = `<header><h2>Level up</h2><span class="hint">Shows up when a new level leaves something to choose</span></header><div class="lu-items">${items.join("")}</div>`;
 }
+function addPick(kind,key,text){ S.picks.push({kind,key,text,lvl:S.level,at:new Date().toISOString()}); }
+const fmtDay = iso => new Date(iso).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+const newPick = (kind,key) => (S.picks||[]).find(p=>p.kind===kind && p.key===key && p.at>S.sessionAt);
+const newBadge = (kind,key) => { const p=newPick(kind,key); return p?`<span class="tag newtag">New · picked ${esc(fmtDay(p.at))}</span>`:""; };
+function renderPicks(){
+  const el=document.getElementById("picks");
+  const fresh=S.picks.filter(p=>p.at>S.sessionAt), old=S.picks.filter(p=>p.at<=S.sessionAt);
+  el.hidden = !fresh.length;
+  if(!fresh.length){ el.innerHTML=""; return; }
+  el.innerHTML = `<header><h2>Picked between sessions</h2><span class="hint">Since your last game on ${esc(fmtDay(S.sessionAt))}</span></header>
+  <p class="hint" style="text-align:left;margin:0 0 10px">Run these by your DM at the start of the next game. Each one is also tagged “New” where it shows up on the sheet.</p>
+  <ul class="pick-list">${fresh.map(p=>`<li><span class="pick-day">${esc(fmtDay(p.at))}</span><span>${esc(p.text)}</span><span class="pick-lvl">Level ${p.lvl}</span></li>`).join("")}</ul>
+  <div class="lu-opts" style="margin-top:12px"><button class="btn small" data-act="lu-session">Next game started: clear the New tags</button></div>
+  ${old.length?`<details class="lu-more"><summary>Earlier picks</summary><ul class="pick-list">${old.map(p=>`<li><span class="pick-day">${esc(fmtDay(p.at))}</span><span>${esc(p.text)}</span><span class="pick-lvl">Level ${p.lvl}</span></li>`).join("")}</ul></details>`:""}`;
+}
 function optRow(o,i){
   const [n,l,cast,range,dur,conc,save,dm,dt,desc]=o;
   const tags=[cast,range,dur,save?`${save} save`:"",dm?`${dm} ${dt}`:""].filter(Boolean);
@@ -1009,23 +1034,24 @@ function luAction(a,arg,arg2){
   if(a==="lu-seen"){ S.seen=S.level; }
   else if(a==="lu-hp"){ const c=M("con"); let gain;
     if(arg==="avg") gain=5+c; else { const r=d(8); gain=Math.max(1,r+c); show(`Level ${S.hpLevel+1} HP`, gain, `d8 ${r} ${sgn(c)}`, ""); }
-    S.hpMax+=gain; S.hp+=gain; S.hpLevel++; if(arg==="avg") note(`+${gain} max HP`, `Now ${S.hpMax}`); }
-  else if(a==="lu-uncollege"){ const c=S.college; S.college=null; note(`College of ${c} removed`, "Pick again in the Level up panel."); }
-  else if(a==="lu-college"){ S.college=arg; note(`College of ${arg}`, "Its features are in your Features list."); }
-  else if(a==="lu-prof"){ S.skillProf[arg]=1; }
-  else if(a==="lu-exp"){ S.skillProf[arg]=2; }
-  else if(a==="lu-plan"){ const s=S.spells[+arg]; s.src="Bard"; note(`Learned ${s.name}`); }
+    S.hpMax+=gain; S.hp+=gain; S.hpLevel++; addPick("hp",String(S.hpLevel),`HP for level ${S.hpLevel}: +${gain} (${arg==="avg"?"average":"rolled"}), max ${S.hpMax}`); if(arg==="avg") note(`+${gain} max HP`, `Now ${S.hpMax}`); }
+  else if(a==="lu-session"){ S.sessionAt=new Date().toISOString(); note("New tags cleared","Your picks are still listed under Earlier picks."); }
+  else if(a==="lu-uncollege"){ const c=S.college; S.college=null; S.picks=S.picks.filter(p=>!(p.kind==="college" && p.key===c)); note(`College of ${c} removed`, "Pick again in the Level up panel."); }
+  else if(a==="lu-college"){ S.college=arg; addPick("college",arg,`College of ${arg}`); note(`College of ${arg}`, "Its features are in your Features list."); }
+  else if(a==="lu-prof"){ S.skillProf[arg]=1; addPick("skill",arg,`Proficiency: ${SKILLS.find(x=>x[0]===arg)[1]} (College of Lore)`); }
+  else if(a==="lu-exp"){ S.skillProf[arg]=2; addPick("skill",arg,`Expertise: ${SKILLS.find(x=>x[0]===arg)[1]}`); }
+  else if(a==="lu-plan"){ const s=S.spells[+arg]; s.src="Bard"; addPick("spell",s.name,`Learned ${s.name} (${ordinal(s.lvl).toLowerCase()})`); note(`Learned ${s.name}`); }
   else if(a==="lu-learn"){ const [n,l,cast,range,dur,conc,save,dm,dt,desc]=SPELL_OPTS[+arg];
     const sp={name:n,lvl:l,src:"Bard",cast,range,dur,desc}; if(conc) sp.conc=true; if(save) sp.save=save; if(dm){ sp.dmg=dm; sp.dtype=dt; }
     if(n==="Cure Wounds"){ sp.heal="1d8"; sp.healMod=true; }
-    S.spells.push(sp); note(`Learned ${n}`); }
+    S.spells.push(sp); addPick("spell",n,`Learned ${n}${l?` (${ordinal(l).toLowerCase()})`:" (cantrip)"}`); note(`Learned ${n}`); }
   else if(a==="lu-asi"){ const L=+arg;
     if(arg2==="cha2") S.abil.cha=Math.min(20,S.abil.cha+2);
     if(arg2==="chadex"){ S.abil.cha=Math.min(20,S.abil.cha+1); S.abil.dex=Math.min(20,S.abil.dex+1); }
     if(arg2==="chacon"){ S.abil.cha=Math.min(20,S.abil.cha+1); S.abil.con=Math.min(20,S.abil.con+1); }
-    S.asi[L]=arg2; note("Ability scores updated"); }
+    S.asi[L]=arg2; addPick("asi",String(L),{cha2:"+2 CHA",chadex:"+1 CHA, +1 DEX",chacon:"+1 CHA, +1 CON"}[arg2]+` (level ${L} ability increase)`); note("Ability scores updated"); }
   else if(a==="lu-feat"){ const L=+arg, [n,desc]=FEATS[+arg2];
-    S.feats.push({name:n,desc,lvl:L}); S.asi[L]="feat:"+n;
+    S.feats.push({name:n,desc,lvl:L}); S.asi[L]="feat:"+n; addPick("feat",n,`Feat: ${n} (level ${L})`);
     if(n==="Actor") S.abil.cha=Math.min(20,S.abil.cha+1);
     if(n==="Resilient (CON)"){ S.abil.con=Math.min(20,S.abil.con+1); if(!S.saveProf.includes("con")) S.saveProf.push("con"); }
     if(n==="Mobile") S.speed+=10;
@@ -1086,7 +1112,7 @@ function importFile(file){
 }
 function renderAll(){
   document.body.classList.toggle("editing", editing);
-  renderHeader(); renderVitals(); renderLevelUp(); renderAbilities(); renderSkills(); renderResources();
+  renderHeader(); renderVitals(); renderLevelUp(); renderPicks(); renderAbilities(); renderSkills(); renderResources();
   renderCombat(); renderSpells(); renderFeatures(); renderGear(); renderProfs(); renderNotes(); renderCampaign(); renderStory(); renderRolls(); renderBackup();
 }
 
